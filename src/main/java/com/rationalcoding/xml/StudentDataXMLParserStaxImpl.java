@@ -25,6 +25,13 @@ import org.springframework.transaction.support.DefaultTransactionDefinition;
 
 import com.rationalcoding.dto.StudentDTO;
 
+/**
+ * Imports students records into database. Exceptions if any detected are
+ * propagated to top.
+ * 
+ * @author yarlagadda
+ * 
+ */
 @Service
 public class StudentDataXMLParserStaxImpl implements StudentDataXMLParser {
 
@@ -54,30 +61,33 @@ public class StudentDataXMLParserStaxImpl implements StudentDataXMLParser {
 		int totalRecordsImported = 0;
 		try {
 			totalRecordsImported = readXMLFile(studentDataFile);
+			// commit the transaction if no exception is detected
+			transactionManager.commit(status);
 		} catch (FileNotFoundException fileNotFoundEx) {
 			transactionManager.rollback(status);
 			throw fileNotFoundEx;
 		} catch (XMLStreamException streamEx) {
 			transactionManager.rollback(status);
 			throw streamEx;
-		}catch (Exception ex) {
+		} catch (Exception ex) {
 			transactionManager.rollback(status);
 			throw ex;
 		}
-		transactionManager.commit(status);
 
 		return totalRecordsImported;
 	}
 
-	private int readXMLFile(File studentDataFile) throws FileNotFoundException, XMLStreamException {
+	private int readXMLFile(File studentDataFile) throws FileNotFoundException, XMLStreamException,
+			UnknownXMlElementException {
 		int totalRecordsImported = 0;
 		InputStream inFileStream = null;
+		XMLEventReader eventReader = null;
 		try {
 
 			XMLInputFactory inputFactory = XMLInputFactory.newInstance();
 			// Setup a new eventReader
 			inFileStream = new FileInputStream(studentDataFile);
-			XMLEventReader eventReader = inputFactory.createXMLEventReader(inFileStream);
+			eventReader = inputFactory.createXMLEventReader(inFileStream);
 			// read the XML document
 			String tagText = null;
 			List<StudentDTO> students = null;
@@ -94,10 +104,14 @@ public class StudentDataXMLParserStaxImpl implements StudentDataXMLParser {
 					} else if (startElementLocale.equals(STUDENT_ELEMENT)) {
 						studentDto = new StudentDTO();
 					} else if (startElementLocale.equals(STUDENT_ID_ELEMENT)) {
-
+						// do nothing
 					} else if (startElementLocale.equals(COURSE_ID_ELEMENT)) {
+						// do nothing
 					} else if (startElementLocale.equals(GRADE_ELEMENT)) {
+						// do nothing
 					} else {
+						throw new UnknownXMlElementException("Unknown element " + startElementLocale
+								+ " detected.");
 					}
 
 					break;
@@ -125,20 +139,26 @@ public class StudentDataXMLParserStaxImpl implements StudentDataXMLParser {
 					} else if (endElementLocale.equals(GRADE_ELEMENT)) {
 						studentDto.setCourseGrade(tagText);
 					} else {
+						throw new UnknownXMlElementException("Unknown element " + endElementLocale
+								+ " detected.");
 					}
 					break;
 				default:
 				}// end switch
 
 			}// end while
-			
+
 		} catch (FileNotFoundException fileNotFoundEx) {
 			throw fileNotFoundEx;
 		} catch (XMLStreamException streamEx) {
 			throw streamEx;
 
 		} finally {
+			// close the input stream quietly
 			IOUtils.closeQuietly(inFileStream);
+			if (eventReader != null) {
+				eventReader.close();
+			}
 		}
 		return totalRecordsImported;
 	}

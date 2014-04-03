@@ -86,7 +86,7 @@ public class ImportStudentTest {
 	
 	@Test
 	@Rollback(true)
-	public void testRecordsNoMultipleOfBatchSize() {
+	public void testRecordsNotMultipleOfBatchSize() {
 		testImport(800);
 	}
 	
@@ -96,6 +96,11 @@ public class ImportStudentTest {
 		testImport(100000);
 	}
 	
+	/**
+	 * Util method to create input file and call import on service class.
+	 * Asserts number of records imported
+	 * @param recordsToImport
+	 */
 	private void testImport(int recordsToImport){
 		File testResourceDirectory = new File("src/test/resources");
 		testResourceDirectory.mkdirs();
@@ -103,17 +108,23 @@ public class ImportStudentTest {
 		if(inputFile.exists()){
 			inputFile.delete();
 		}
-		createStudentXMLFile(inputFile,recordsToImport);
+		try {
+			createStudentXMLFile(inputFile,recordsToImport);
+		} catch (XMLStreamException e1) {
+			Assert.fail("Unable to create input file for testing. Detected XML stream exception.");
+		} catch (FileNotFoundException e) {
+			Assert.fail("Unable to create input file for testing. Detected filenot found exception.");
+		}
 		int countBeforeImport = getTotalRecords();
 		try {
 			int recordsImported = studentDataXMLParserStaxImpl.importStudentData(inputFile);
 			Assert.assertEquals(recordsToImport, recordsImported);
 		} catch (FileNotFoundException e) {
-			Assert.fail("Exception detected when parsing xml file");
+			Assert.fail("File not found exception detected when parsing xml file");
 		} catch (XMLStreamException e) {
-			Assert.fail("Exception detected when parsing xml file");
+			Assert.fail("XML stream exception detected when parsing xml file");
 		} catch (Exception e) {
-			Assert.fail("File not found exception expected but found unknow exception");
+			Assert.fail("Exception detected when trying to import student records.");
 		}
 		int countAfterImport = getTotalRecords();
 		Assert.assertEquals(countBeforeImport+recordsToImport, countAfterImport);
@@ -124,7 +135,7 @@ public class ImportStudentTest {
 		
 	}
 
-	private void createStudentXMLFile(File fileName, int numOfRecords) {
+	private void createStudentXMLFile(File fileName, int numOfRecords) throws XMLStreamException, FileNotFoundException {
 		XMLOutputFactory xmlOutputFactory = XMLOutputFactory.newInstance();
 		try {
 			XMLEventWriter xmlEventWriter = xmlOutputFactory.createXMLEventWriter(new FileOutputStream(
@@ -155,8 +166,10 @@ public class ImportStudentTest {
 
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
+			throw e;
 		} catch (XMLStreamException ex) {
 			ex.printStackTrace();
+			throw ex;
 		}
 	}
 
